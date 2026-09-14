@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './App.css';
 
 export default function App() {
   const [city, setCity] = useState('');
@@ -9,28 +10,64 @@ export default function App() {
 
   const isCelsius = unit === 'C';
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  function getPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Your browser does not support location.'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
+    });
+  }
+
+  async function loadWeather(query) {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+      const response = await fetch(`/api/weather?city=${encodeURIComponent(query)}`);
       const data = await response.json();
 
       if (!response.ok) {
         setError(data.message);
         setWeather(null);
-        return;
+        return null;
       }
 
       setWeather(data);
+      return data;
     } catch {
       setError('Could not reach the server. Is the backend running?');
       setWeather(null);
+      return null;
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    await loadWeather(city);
+  }
+
+  async function handleUseLocation() {
+    setError(null);
+
+    let position;
+    try {
+      position = await getPosition();
+    } catch (err) {
+      if (err.code === 1) setError('Location permission denied. Try searching by city instead.');
+      else if (err.code === 2) setError('Your position is unavailable right now.');
+      else if (err.code === 3) setError('Finding your location took too long.');
+      else setError(err.message || 'Could not get your location.');
+      setWeather(null);
+      return;
+    }
+
+    const { latitude, longitude } = position.coords;
+    const data = await loadWeather(`${latitude},${longitude}`);
+    if (data) setCity(data.location.city);
   }
 
   return (
@@ -48,6 +85,7 @@ export default function App() {
           placeholder="e.g. London"
         />
         <button type="submit">Search</button>
+        <button type="button" onClick={handleUseLocation}>Use my location</button>
         <button type="button" onClick={() => setUnit(isCelsius ? 'F' : 'C')}>
           Show °{isCelsius ? 'F' : 'C'}
         </button>
