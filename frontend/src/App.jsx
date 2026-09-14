@@ -18,10 +18,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [unit, setUnit] = useState('C');
-  const [selectedDay , setSelectedDay] = useState(null);
-  const activeDay = weather?.forecast[selectedDay];
+  const [selectedDay, setSelectedDay] = useState(0);
 
   const isCelsius = unit === 'C';
+  const activeDay = weather?.forecast?.[selectedDay];
 
   function getPosition() {
     return new Promise((resolve, reject) => {
@@ -48,6 +48,7 @@ export default function App() {
       }
 
       setWeather(data);
+      setSelectedDay(0);
       return data;
     } catch {
       setError({ status: null, message: 'Could not reach the server. Is the backend running?' });
@@ -140,40 +141,62 @@ export default function App() {
         <div className="results">
           <section className="current">
             <h2>{weather.location.city}, {weather.location.country}</h2>
+
             <div className="temp-row">
               <img src={`https:${weather.current.icon}`} alt={weather.current.condition} />
               <span className="temp">
                 {isCelsius ? weather.current.tempC : weather.current.tempF}°{unit}
               </span>
             </div>
+
             <p>{weather.current.condition}</p>
-            <p className="meta">
-              Humidity {weather.current.humidity}% · Wind {weather.current.windKph} kph
-            </p>
+
+            <div className="current-details">
+              <div>
+                <span>Humidity</span>
+                <strong>{weather.current.humidity}%</strong>
+              </div>
+              <div>
+                <span>Wind</span>
+                <strong>{weather.current.windKph} kph</strong>
+              </div>
+              <div>
+                <span>Feels like</span>
+                <strong>
+                  {isCelsius ? weather.current.feelsLikeC : weather.current.feelsLikeF}°
+                </strong>
+              </div>
+              <div>
+                <span>Local time</span>
+                <strong>{weather.location.localTime.slice(11, 16)}</strong>
+              </div>
+            </div>
           </section>
 
-          <section className="day-tabs">
-        {weather.forecast.map((day, index) => (
-          <button
-            key={day.date}
-            type="button"
-            className={index === selectedDay ? 'day-tab active' : 'day-tab'}
-            onClick={() => setSelectedDay(index)}
-          >
-            {index === 0 ? 'Today' : dayLabel(day.date)}
-          </button>
-        ))}
-      </section>
+          <section className="day-tabs" aria-label="Choose a day">
+            {weather.forecast.map((day, index) => (
+              <button
+                key={day.date}
+                type="button"
+                className={index === selectedDay ? 'day-tab active' : 'day-tab'}
+                onClick={() => setSelectedDay(index)}
+              >
+                {index === 0 ? 'Today' : dayLabel(day.date)}
+              </button>
+            ))}
+          </section>
 
-      <section className="hourly" aria-label="Hourly forecast">
-        {activeDay.hours.map((hour) => (
-          <article key={hour.time} className="hour-card">
-            <p className="hour-time">{hour.time.slice(11, 16)}</p>
-            <img src={`https:${hour.icon}`} alt={hour.condition} />
-            <p className="hour-temp">{isCelsius ? hour.tempC : hour.tempF}°</p>
-          </article>
-        ))}
-      </section>
+          {activeDay && (
+            <section className="hourly" aria-label="Hourly forecast">
+              {activeDay.hours.map((hour) => (
+                <article key={hour.time} className="hour-card">
+                  <p className="hour-time">{hour.time.slice(11, 16)}</p>
+                  <img src={`https:${hour.icon}`} alt={hour.condition} />
+                  <p className="hour-temp">{isCelsius ? hour.tempC : hour.tempF}°</p>
+                </article>
+              ))}
+            </section>
+          )}
         </div>
       )}
     </main>

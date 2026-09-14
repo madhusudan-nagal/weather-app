@@ -251,3 +251,17 @@ button:active { transform: scale(0.97); }
   background: #cbd5e1;
   border-radius: 3px;
 }
+
+
+.current-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.current-details span {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+}

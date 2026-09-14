@@ -8,6 +8,8 @@ export function mapWeather(raw) {
     current: {
       tempC: raw.current.temp_c,
       tempF: raw.current.temp_f,
+    feelsLikeC: raw.current.feelslike_c,
+      feelsLikeF: raw.current.feelslike_f,
       condition: raw.current.condition.text,
       icon: raw.current.condition.icon,
       humidity: raw.current.humidity,
