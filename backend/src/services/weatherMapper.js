@@ -21,6 +21,14 @@ export function mapWeather(raw) {
       minTempF: day.day.mintemp_f,
       condition: day.day.condition.text,
       icon: day.day.condition.icon,
+      hours: day.day && day.hour.map((h) => ({
+        time: h.time,
+        tempC: h.temp_c,
+        tempF: h.temp_f,
+        condition: h.condition.text,
+        icon: h.condition.icon,
+      })),
     })),
   };
 }
+

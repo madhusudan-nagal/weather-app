@@ -2,6 +2,7 @@
 
 Search for a city or use your location. Shows current weather and a three-day forecast. You can switch between °C and °F.
 
+
 ## Tech stack
 
 - **Frontend:** React (Vite), plain CSS
@@ -17,7 +18,7 @@ Search for a city or use your location. Shows current weather and a three-day fo
 You need Node.js 18 or newer.
 
 ```bash
-git clone <your-repo-url>
+git clone <your-repo-url> eg : gitHub.com/user/repo/
 cd weather-app
 ```
 
@@ -59,7 +60,7 @@ Open http://localhost:5173. Vite sends `/api` requests to the backend on port 30
 - City search using a form with a label and a submit button
 - Current weather: temperature, condition, humidity, wind speed
 - Three-day forecast, laid out with CSS Grid
-- "Use my location" button, using the Geolocation API
+- "Use my location" button, using the Geolocation API 
 - °C / °F toggle
 - Four UI states: empty, loading, success, error
 - Loading spinner, fade-in animation, hover effects
