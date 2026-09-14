@@ -13,17 +13,14 @@ export function mapWeather(raw) {
       humidity: raw.current.humidity,
       windKph: raw.current.wind_kph,
     },
-    forecast: raw.forecast.forecastday.map(day => ({
-        date: day.date,
-        maxTempC: day.day.maxtemp_c,
-        maxTempF: day.day.maxtemp_f,
-        minTempC: day.day.mintemp_c,
-        minTempF: day.day.mintemp_f,
-        condition: day.day.condition.text,
-        icon: day.day.condition.icon,
-      })
-    )
-  
-   
+    forecast: raw.forecast.forecastday.map((day) => ({
+      date: day.date,
+      maxTempC: day.day.maxtemp_c,
+      maxTempF: day.day.maxtemp_f,
+      minTempC: day.day.mintemp_c,
+      minTempF: day.day.mintemp_f,
+      condition: day.day.condition.text,
+      icon: day.day.condition.icon,
+    })),
   };
-}   
+}

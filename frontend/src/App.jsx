@@ -5,6 +5,8 @@ export default function App() {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [unit, setUnit] = useState('C');  
+  const isCelsius = unit === 'C';
 
   async function handleSubmit(event) {
     event.preventDefault();
