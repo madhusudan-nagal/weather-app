@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 function errorTitle(status) {
@@ -19,9 +19,30 @@ export default function App() {
   const [error, setError] = useState(null);
   const [unit, setUnit] = useState('C');
   const [selectedDay, setSelectedDay] = useState(0);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const isCelsius = unit === 'C';
   const activeDay = weather?.forecast?.[selectedDay];
+
+  useEffect(() => {
+    if (city.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/cities?q=${encodeURIComponent(city)}`);
+        if (!response.ok) return;
+        setSuggestions(await response.json());
+      } catch {
+        setSuggestions([]);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [city]);
 
   function getPosition() {
     return new Promise((resolve, reject) => {
@@ -36,6 +57,7 @@ export default function App() {
   async function loadWeather(query) {
     setLoading(true);
     setError(null);
+    setShowSuggestions(false);
 
     try {
       const response = await fetch(`/api/weather?city=${encodeURIComponent(query)}`);
@@ -66,6 +88,7 @@ export default function App() {
 
   async function handleUseLocation() {
     setError(null);
+    setShowSuggestions(false);
 
     let position;
     try {
@@ -95,12 +118,44 @@ export default function App() {
 
       <form onSubmit={handleSubmit}>
         <label htmlFor="city">City</label>
-        <input
-          id="city"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          placeholder="e.g. London"
-        />
+
+        <div className="search-wrap">
+          <input
+            id="city"
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            placeholder="e.g. London"
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={showSuggestions && suggestions.length > 0}
+          />
+
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="suggestions" role="listbox">
+              {suggestions.map((s) => (
+                <li key={s.id} role="option" aria-selected="false">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCity(s.name);
+                      setShowSuggestions(false);
+                      loadWeather(s.name);
+                    }}
+                  >
+                    <strong>{s.name}</strong>
+                    <span>{s.region ? `${s.region}, ` : ''}{s.country}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <button type="submit">Search</button>
         <button type="button" onClick={handleUseLocation}>Use my location</button>
 
