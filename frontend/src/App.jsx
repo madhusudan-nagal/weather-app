@@ -8,12 +8,18 @@ function errorTitle(status) {
   return 'Something Went Wrong';
 }
 
+function dayLabel(dateString) {
+  return new Date(dateString).toLocaleDateString('en-GB', { weekday: 'short' });
+}
+
 export default function App() {
   const [city, setCity] = useState('');
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [unit, setUnit] = useState('C');
+  const [selectedDay , setSelectedDay] = useState(null);
+  const activeDay = weather?.forecast[selectedDay];
 
   const isCelsius = unit === 'C';
 
@@ -146,18 +152,28 @@ export default function App() {
             </p>
           </section>
 
-          <section className="forecast">
-            {weather.forecast.map((day) => (
-              <article key={day.date} className="forecast-card">
-                <img src={`https:${day.icon}`} alt={day.condition} />
-                <h3>{day.date}</h3>
-                <p className="range">
-                  {isCelsius ? day.maxTempC : day.maxTempF}° / {isCelsius ? day.minTempC : day.minTempF}°
-                </p>
-                <p>{day.condition}</p>
-              </article>
-            ))}
-          </section>
+          <section className="day-tabs">
+        {weather.forecast.map((day, index) => (
+          <button
+            key={day.date}
+            type="button"
+            className={index === selectedDay ? 'day-tab active' : 'day-tab'}
+            onClick={() => setSelectedDay(index)}
+          >
+            {index === 0 ? 'Today' : dayLabel(day.date)}
+          </button>
+        ))}
+      </section>
+
+      <section className="hourly" aria-label="Hourly forecast">
+        {activeDay.hours.map((hour) => (
+          <article key={hour.time} className="hour-card">
+            <p className="hour-time">{hour.time.slice(11, 16)}</p>
+            <img src={`https:${hour.icon}`} alt={hour.condition} />
+            <p className="hour-temp">{isCelsius ? hour.tempC : hour.tempF}°</p>
+          </article>
+        ))}
+      </section>
         </div>
       )}
     </main>

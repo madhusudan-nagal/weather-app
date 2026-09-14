@@ -201,3 +201,53 @@ button:active { transform: scale(0.97); }
   form { gap: 0.4rem; }
   label { width: 100%; }
 }
+
+
+.day-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+}
+
+.day-tab {
+  background: white;
+  color: #2b7cd3;
+  border: 1px solid #c9d4e0;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.day-tab.active {
+  background: #2b7cd3;
+  color: white;
+  border-color: #2b7cd3;
+}
+
+.hourly {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hour-card {
+  flex: 0 0 74px;
+  scroll-snap-align: start;
+  background: white;
+  border-radius: 12px;
+  padding: 0.7rem 0.4rem;
+  text-align: center;
+}
+
+.hour-card img { width: 32px; }
+.hour-time { font-size: 0.75rem; color: #6b7280; margin: 0 0 0.2rem; }
+.hour-temp { font-size: 1rem; font-weight: 600; margin: 0.2rem 0 0; }
+
+.hourly::-webkit-scrollbar { height: 6px; }
+.hourly::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
