@@ -1,122 +1,61 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState } from 'react';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [city, setCity] = useState('');
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message);
+        setWeather(null);
+        return;
+      }
+
+      setWeather(data);
+    } catch {
+      setError('Could not reach the server. Is the backend running?');
+      setWeather(null);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <main>
+      <header><h1>Weather</h1></header>
 
-      <div className="ticks"></div>
+      <form onSubmit={handleSubmit}>
+        <label htmlFor="city">City</label>
+        <input
+          id="city"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          placeholder="e.g. London"
+        />
+        <button type="submit">Search</button>
+      </form>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {loading && <p>Loading…</p>}
+      {error && <p role="alert">{error}</p>}
+      {!loading && !error && !weather && <p>Search for a city to see its weather.</p>}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {weather && !loading && (
+        <section>
+          <h2>{weather.location.city}, {weather.location.country}</h2>
+          <p>{weather.current.tempC}°C — {weather.current.condition}</p>
+          <p>Humidity {weather.current.humidity}% · Wind {weather.current.windKph} kph</p>
+        </section>
+      )}
+    </main>
+  );
 }
-
-export default App
