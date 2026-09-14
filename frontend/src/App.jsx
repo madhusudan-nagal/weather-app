@@ -24,12 +24,10 @@ export default function App() {
 
   const isCelsius = unit === 'C';
   const activeDay = weather?.forecast?.[selectedDay];
+  const canSuggest = city.trim().length >= 3;
 
-  useEffect(() => {
-    if (city.trim().length < 3) {
-      setSuggestions([]);
-      return;
-    }
+    useEffect(() => {
+    if (!canSuggest) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -42,7 +40,7 @@ export default function App() {
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [city]);
+  }, [city, canSuggest]);
 
   function getPosition() {
     return new Promise((resolve, reject) => {
@@ -135,7 +133,7 @@ export default function App() {
             aria-expanded={showSuggestions && suggestions.length > 0}
           />
 
-          {showSuggestions && suggestions.length > 0 && (
+          {showSuggestions && canSuggest && suggestions.length > 0 && (
             <ul className="suggestions" role="listbox">
               {suggestions.map((s) => (
                 <li key={s.id} role="option" aria-selected="false">
