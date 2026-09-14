@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import './App.css';
 
+function errorTitle(status) {
+  if (status === 400) return 'Bad Request';
+  if (status === 404) return 'Not Found';
+  if (status === 502) return 'Service Unavailable';
+  return 'Something Went Wrong';
+}
+
 export default function App() {
   const [city, setCity] = useState('');
   const [weather, setWeather] = useState(null);
@@ -29,7 +36,7 @@ export default function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message);
+        setError({ status: response.status, message: data.message });
         setWeather(null);
         return null;
       }
@@ -37,7 +44,7 @@ export default function App() {
       setWeather(data);
       return data;
     } catch {
-      setError('Could not reach the server. Is the backend running?');
+      setError({ status: null, message: 'Could not reach the server. Is the backend running?' });
       setWeather(null);
       return null;
     } finally {
@@ -57,10 +64,13 @@ export default function App() {
     try {
       position = await getPosition();
     } catch (err) {
-      if (err.code === 1) setError('Location permission denied. Try searching by city instead.');
-      else if (err.code === 2) setError('Your position is unavailable right now.');
-      else if (err.code === 3) setError('Finding your location took too long.');
-      else setError(err.message || 'Could not get your location.');
+      let message;
+      if (err.code === 1) message = 'Location permission denied. Try searching by city instead.';
+      else if (err.code === 2) message = 'Your position is unavailable right now.';
+      else if (err.code === 3) message = 'Finding your location took too long.';
+      else message = err.message || 'Could not get your location.';
+
+      setError({ status: null, message });
       setWeather(null);
       return;
     }
@@ -86,8 +96,18 @@ export default function App() {
         />
         <button type="submit">Search</button>
         <button type="button" onClick={handleUseLocation}>Use my location</button>
-        <button type="button" onClick={() => setUnit(isCelsius ? 'F' : 'C')}>
-          Show °{isCelsius ? 'F' : 'C'}
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={!isCelsius}
+          aria-label="Temperature unit"
+          className={isCelsius ? 'switch' : 'switch on'}
+          onClick={() => setUnit(isCelsius ? 'F' : 'C')}
+        >
+          <span className="switch-label">°C</span>
+          <span className="switch-label">°F</span>
+          <span className="switch-knob" />
         </button>
       </form>
 
@@ -98,7 +118,13 @@ export default function App() {
         </div>
       )}
 
-      {error && !loading && <p className="error" role="alert">{error}</p>}
+      {error && !loading && (
+        <section className="error-state" role="alert">
+          {error.status && <p className="error-code">{error.status}</p>}
+          <h2 className="error-title">{errorTitle(error.status)}</h2>
+          <p className="error-message">{error.message}</p>
+        </section>
+      )}
 
       {!loading && !error && !weather && (
         <p className="empty">Search for a city to see its weather.</p>

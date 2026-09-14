@@ -14,9 +14,9 @@ app.get('/api/health', (req, res) => {
 app.get('/api/weather', async (req, res) => {
   const city = req.query.city?.trim();
 
-  if (!city) {
-    return res.status(400).json({ message: 'Please enter a city name.' });
-  }
+ if (!city) {
+  return res.status(400).json({ message: 'Please enter a city name.' });
+}
 
   const cached = getCached(city.toLowerCase());
   if (cached) return res.json(cached);
@@ -28,10 +28,14 @@ app.get('/api/weather', async (req, res) => {
     res.json(shaped);
   } catch (error) {
     if (error.code === 'CITY_NOT_FOUND') {
-      return res.status(404).json({ message: `We couldn't find "${city}".` });
-    }
+  return res.status(404).json({
+    message: `We couldn't find "${city}". Check the spelling and try again.`
+  });
+}
     console.error('Weather request failed:', error.message);
-    res.status(502).json({ message: 'Weather service is unavailable. Try again shortly.' });
+    res.status(502).json({
+  message: 'Weather service is unavailable right now. Please try again shortly.'
+});
   }
 });
 
