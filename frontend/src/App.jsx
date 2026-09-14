@@ -5,7 +5,8 @@ export default function App() {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [unit, setUnit] = useState('C');  
+  const [unit, setUnit] = useState('C');
+
   const isCelsius = unit === 'C';
 
   async function handleSubmit(event) {
@@ -33,8 +34,10 @@ export default function App() {
   }
 
   return (
-    <main>
-      <header><h1>Weather</h1></header>
+    <main className="app">
+      <header>
+        <h1>Weather</h1>
+      </header>
 
       <form onSubmit={handleSubmit}>
         <label htmlFor="city">City</label>
@@ -45,18 +48,53 @@ export default function App() {
           placeholder="e.g. London"
         />
         <button type="submit">Search</button>
+        <button type="button" onClick={() => setUnit(isCelsius ? 'F' : 'C')}>
+          Show °{isCelsius ? 'F' : 'C'}
+        </button>
       </form>
 
-      {loading && <p>Loading…</p>}
-      {error && <p role="alert">{error}</p>}
-      {!loading && !error && !weather && <p>Search for a city to see its weather.</p>}
+      {loading && (
+        <div className="loading">
+          <div className="spinner" />
+          <p>Fetching weather…</p>
+        </div>
+      )}
+
+      {error && !loading && <p className="error" role="alert">{error}</p>}
+
+      {!loading && !error && !weather && (
+        <p className="empty">Search for a city to see its weather.</p>
+      )}
 
       {weather && !loading && (
-        <section>
-          <h2>{weather.location.city}, {weather.location.country}</h2>
-          <p>{weather.current.tempC}°C — {weather.current.condition}</p>
-          <p>Humidity {weather.current.humidity}% · Wind {weather.current.windKph} kph</p>
-        </section>
+        <div className="results">
+          <section className="current">
+            <h2>{weather.location.city}, {weather.location.country}</h2>
+            <div className="temp-row">
+              <img src={`https:${weather.current.icon}`} alt={weather.current.condition} />
+              <span className="temp">
+                {isCelsius ? weather.current.tempC : weather.current.tempF}°{unit}
+              </span>
+            </div>
+            <p>{weather.current.condition}</p>
+            <p className="meta">
+              Humidity {weather.current.humidity}% · Wind {weather.current.windKph} kph
+            </p>
+          </section>
+
+          <section className="forecast">
+            {weather.forecast.map((day) => (
+              <article key={day.date} className="forecast-card">
+                <img src={`https:${day.icon}`} alt={day.condition} />
+                <h3>{day.date}</h3>
+                <p className="range">
+                  {isCelsius ? day.maxTempC : day.maxTempF}° / {isCelsius ? day.minTempC : day.minTempF}°
+                </p>
+                <p>{day.condition}</p>
+              </article>
+            ))}
+          </section>
+        </div>
       )}
     </main>
   );
