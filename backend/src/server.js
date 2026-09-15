@@ -50,7 +50,7 @@ app.get('/api/weather', async (req, res) => {
   // Tier 1: in-memory. Microseconds, but per-process and lost on restart.
   const memoryHit = getCached(key);
   if (memoryHit) {
-    upsertRecent({ query: key, weather: memoryHit });
+    await upsertRecent({ query: key, weather: memoryHit });
     return res.json(memoryHit);
   }
 
@@ -59,7 +59,7 @@ app.get('/api/weather', async (req, res) => {
   const dbHit = await getCachedFromDb(key);
   if (dbHit) {
     setCached(key, dbHit); // warm tier 1 so the next hit is instant
-    upsertRecent({ query: key, weather: dbHit });
+    await upsertRecent({ query: key, weather: dbHit });
     return res.json(dbHit);
   }
 
@@ -70,7 +70,7 @@ app.get('/api/weather', async (req, res) => {
 
     setCached(key, shaped);
     setCachedInDb(key, shaped);                    // not awaited
-    upsertRecent({ query: key, weather: shaped }); // not awaited
+    await upsertRecent({ query: key, weather: shaped }); // not awaited
 
     res.json(shaped);
   } catch (error) {

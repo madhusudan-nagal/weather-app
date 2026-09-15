@@ -22,11 +22,18 @@ export async function upsertRecent({ query, weather }) {
   const db = getDb();
   if (!db) return;
 
+  // Key on the resolved place, not on what was typed.
+  //
+  // "London", "london" and the coordinates 51.51,-0.13 all resolve to the
+  // same city, so keying on the raw query would store three chips for one
+  // place. City plus country, because there is a London in Ontario too.
+  const placeKey = `${weather.location.city}|${weather.location.country}`
+    .toLowerCase();
+
   try {
     await db.collection(COLLECTION).updateOne(
-      { query: query.toLowerCase() },
+      { query: placeKey },
       {
-        // $set overwrites these on every search
         $set: {
           displayName: weather.location.city,
           country: weather.location.country,
@@ -36,11 +43,7 @@ export async function upsertRecent({ query, weather }) {
           icon: weather.current.icon,
           lastSearched: new Date(),
         },
-        // $inc is atomic - two simultaneous searches cannot both read 3 and
-        // both write 4, which a read-modify-write in application code would
         $inc: { times: 1 },
-        // $setOnInsert only applies when the document is created, so this
-        // records when the city was first ever looked at
         $setOnInsert: { firstSearched: new Date() },
       },
       { upsert: true }
@@ -51,7 +54,6 @@ export async function upsertRecent({ query, weather }) {
     console.error('Recent search write failed:', error.message);
   }
 }
-
 /**
  * Keep only the newest MAX_KEPT documents.
  *
