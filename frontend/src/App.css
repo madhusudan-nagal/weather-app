@@ -1,3 +1,34 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   App.css  —  component styles
+   Global resets, body and the .app container live in index.css.
+
+   MAP OF THIS FILE — each section names the JSX it styles
+   ─────────────────────────────────────────────────────────────────────────
+    1. SEARCH FORM ............. <form>, <label>, <input>, buttons
+    2. UNIT SWITCH ............. .switch  (the °C / °F toggle button)
+    3. AUTOCOMPLETE ............ .search-wrap, .suggestions
+    4. RECENT SEARCH CHIPS ..... .recent, .chip, .chip-menu
+    5. LOADING STATE ........... .loading, .spinner
+    6. ERROR STATE ............. .error-state
+    7. EMPTY STATE ............. .empty
+    8. CURRENT WEATHER CARD .... .results, .current, .temp-row, .current-details
+    9. DAY TABS ................ .day-tabs
+   10. HOURLY SCROLLER ......... .hourly, .hour-card
+   11. RESPONSIVE .............. all breakpoints, collected
+   12. MOTION PREFERENCE ....... prefers-reduced-motion
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══ 1. SEARCH FORM ════════════════════════════════════════════════════════
+   JSX:  <form onSubmit={handleSubmit}>
+           <label htmlFor="city">  <input id="city">
+           <button type="submit">Search</button>
+           <button type="button">Use my location</button>
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Flexbox, not Grid: label, input and buttons sit on a single axis.
+   flex-wrap lets them drop to a second line on a narrow screen instead of
+   overflowing. */
 form {
   display: flex;
   gap: 0.5rem;
@@ -5,15 +36,16 @@ form {
   flex-wrap: wrap;
 }
 
-label { font-weight: 500; }
+label {
+  font-weight: 500;
+}
 
 input {
-  flex: 1;
-  min-width: 140px;
   padding: 0.6rem 0.75rem;
+  font-family: inherit;
+  font-size: 1rem;
   border: 1px solid #ccc;
   border-radius: 6px;
-  font-size: 1rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -23,20 +55,34 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(43, 124, 211, 0.15);
 }
 
+/* A bare element selector, so every button on the page inherits this.
+   Convenient, but it means .switch, .chip-* and .day-tab all have to override
+   it below - the cost of broad selectors. */
 button {
   padding: 0.6rem 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #fff;
+  background: #2b7cd3;
   border: 1px solid #2b7cd3;
   border-radius: 6px;
-  background: #2b7cd3;
-  color: white;
-  font-size: 0.95rem;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
 }
 
-button:hover { background: #1f5fa8; }
+button:hover  { background: #1f5fa8; }
 button:active { transform: scale(0.97); }
 
+
+/* ═══ 2. UNIT SWITCH ════════════════════════════════════════════════════════
+   JSX:  <button role="switch" className={isCelsius ? 'switch' : 'switch on'}>
+           <span className="switch-label">°C</span>
+           <span className="switch-label">°F</span>
+           <span className="switch-knob" />
+   The `on` class is computed from state - React never touches the DOM.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* relative: makes this the positioning context for the absolute knob */
 .switch {
   position: relative;
   display: inline-flex;
@@ -44,14 +90,16 @@ button:active { transform: scale(0.97); }
   width: 84px;
   height: 38px;
   padding: 0;
+  background: #eef2f7;
   border: 1px solid #c9d4e0;
   border-radius: 19px;
-  background: #eef2f7;
 }
 
-.switch:hover { background: #eef2f7; }
-.switch:active { transform: none; }
+.switch:hover  { background: #eef2f7; }  /* cancels button:hover */
+.switch:active { transform: none; }      /* cancels button:active */
 
+/* position + z-index so the labels sit above the knob. z-index has no effect
+   on a statically positioned element, which is why relative is needed here. */
 .switch-label {
   flex: 1;
   position: relative;
@@ -68,17 +116,313 @@ button:active { transform: scale(0.97); }
   left: 3px;
   width: 38px;
   height: 30px;
-  border-radius: 15px;
   background: #2b7cd3;
+  border-radius: 15px;
+  /* transform, not `left`: it skips layout and runs on the compositor */
   transition: transform 0.25s ease;
 }
 
 .switch.on .switch-knob { transform: translateX(40px); }
 
-.switch .switch-label:nth-child(1) { color: #fff; }
-.switch .switch-label:nth-child(2) { color: #6b7280; }
+.switch    .switch-label:nth-child(1) { color: #fff; }
+.switch    .switch-label:nth-child(2) { color: #6b7280; }
 .switch.on .switch-label:nth-child(1) { color: #6b7280; }
 .switch.on .switch-label:nth-child(2) { color: #fff; }
+
+
+/* ═══ 3. AUTOCOMPLETE ═══════════════════════════════════════════════════════
+   JSX:  <div className="search-wrap">
+           <input id="city">
+           <ul className="suggestions" role="listbox">
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* relative: the anchor for the absolute dropdown below */
+.search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+}
+
+.search-wrap input {
+  width: 100%;
+}
+
+/* absolute against .search-wrap. top: calc(100% + 4px) means "the full height
+   of my parent, plus 4px", so it stays correct if the input height changes.
+   left/right: 0 stretches it to the input width exactly.
+   z-index lifts it above the weather card, which paints later in the document. */
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  background: #fff;
+  border: 1px solid #d7dde3;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  animation: dropIn 0.18s ease both;
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.suggestions button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  background: none;
+  border: none;
+  border-radius: 6px;
+}
+
+.suggestions button:hover,
+.suggestions button:focus {
+  background: #eaf2fb;
+}
+
+.suggestions button:active { transform: none; }
+
+.suggestions strong { display: block; }
+
+.suggestions span {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+
+/* ═══ 4. RECENT SEARCH CHIPS ════════════════════════════════════════════════
+   JSX:  <nav className="recent">
+           <span className="recent-label">Recent</span>
+           <ul><li>
+             <div className="chip">                      <- container, not a button
+               <button className="chip-body">            <- click = search
+                 <img className="chip-icon">
+                 <span className="chip-text">
+                   <span className="chip-name">
+                   <span className="chip-meta">          <- "2 min ago"
+                 <span className="chip-temp">
+               <button className="chip-more">⋯</button>   <- click = open menu
+               <div className="chip-menu">               <- the popover
+   Data comes from GET /api/recent (MongoDB recent_searches).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.recent {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 1.15rem;
+  animation: chipsIn 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes chipsIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.recent-label {
+  flex: 0 0 auto;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #9aa4b0;
+  user-select: none;
+}
+
+/* Flexbox, not Grid: one horizontal row that scrolls rather than wraps, so a
+   long history never pushes the weather card down the page.
+   overflow-y stays visible or the scroll container would clip the popover. */
+.recent ul {
+  display: flex;
+  gap: 0.5rem;
+  list-style: none;
+  /* Room below for the popover. overflow-x: auto silently forces overflow-y
+     to auto as well - the spec does not allow one axis to scroll while the
+     other stays visible - so the menu needs vertical space inside the scroll
+     container rather than escaping it. The negative margin pulls the
+     following content back up so the gap is not visible. */
+  padding: 0.25rem 0 5.5rem;
+  margin: 0 0 -5.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.recent ul::-webkit-scrollbar { display: none; }
+
+/* ── The chip shell ──────────────────────────────────────────────────────── */
+
+/* A div, not a button: HTML forbids a button inside a button, so the chip body
+   and the menu trigger are siblings.
+   relative: the positioning context for .chip-menu. */
+.chip {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid #e0e6ec;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 32, 48, 0.05);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.chip:hover {
+  border-color: #b9d3ef;
+  box-shadow: 0 4px 12px rgba(43, 124, 211, 0.12);
+  transform: translateY(-1px);
+}
+
+/* Stays highlighted while its menu is open */
+.chip.menu-open {
+  border-color: #b9d3ef;
+  box-shadow: 0 4px 12px rgba(43, 124, 211, 0.14);
+}
+
+/* ── Chip body: click to re-search ───────────────────────────────────────── */
+
+.chip-body {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.3rem 0.5rem 0.65rem;
+  background: none;
+  border: none;
+  border-radius: 12px 0 0 12px;  /* square on the right, where ⋯ joins */
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip-body:hover  { background: #f7fafd; }
+.chip-body:active { transform: none; }
+
+.chip-icon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+}
+
+.chip-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.chip-name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+/* How stale the stored snapshot is - the data is from the last search, not live */
+.chip-meta {
+  margin-top: 0.1rem;
+  font-size: 0.66rem;
+  color: #9aa4b0;
+}
+
+.chip-temp {
+  padding-left: 0.3rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #46586b;
+}
+
+/* ── Menu trigger ────────────────────────────────────────────────────────── */
+
+.chip-more {
+  flex: 0 0 auto;
+  width: 20px;
+  padding: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #9aa4b0;
+  background: none;
+  border: none;
+  border-left: 1px solid #eef1f5;
+  border-radius: 0 12px 12px 0;
+  cursor: pointer;
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+.chip-more:hover  { color: #1f5fa8; background: #eaf2fb; }
+.chip-more:active { transform: none; }
+
+/* ── Popover ─────────────────────────────────────────────────────────────── */
+
+/* absolute against .chip. Without position: relative on .chip this would
+   anchor to the page instead, and every menu would stack in one corner. */
+.chip-menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 20;
+  min-width: 158px;
+  padding: 0.25rem;
+  background: #fff;
+  border: 1px solid #e0e6ec;
+  border-radius: 9px;
+  box-shadow: 0 10px 26px rgba(16, 32, 48, 0.16);
+  animation: menuIn 0.16s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The arrow: a rotated square with two borders, half-overlapping the edge.
+   Simpler than a CSS triangle, and it inherits the border colour. */
+.chip-menu::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  border-top: 1px solid #e0e6ec;
+  border-left: 1px solid #e0e6ec;
+  transform: rotate(45deg);
+}
+
+.chip-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  font-size: 0.82rem;
+  color: #46586b;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+
+/* Red for "Remove location" - destructive */
+.chip-menu button:hover  { color: #b42318; background: #fdf2f1; }
+.chip-menu button:active { transform: none; }
+
+/* Blue for "Clear all", the last item */
+.chip-menu button:last-child:hover { color: #1f5fa8; background: #f0f5fb; }
+
+
+/* ═══ 5. LOADING STATE ══════════════════════════════════════════════════════
+   JSX:  {loading && <div className="loading"><div className="spinner" />…
+   ─────────────────────────────────────────────────────────────────────────── */
 
 .loading {
   display: flex;
@@ -87,6 +431,8 @@ button:active { transform: scale(0.97); }
   margin-top: 2rem;
 }
 
+/* @keyframes, not transition: it loops forever with no state change to react
+   to. `linear` keeps the speed constant so it does not appear to stutter. */
 .spinner {
   width: 22px;
   height: 22px;
@@ -100,159 +446,103 @@ button:active { transform: scale(0.97); }
   to { transform: rotate(360deg); }
 }
 
+
+/* ═══ 6. ERROR STATE ════════════════════════════════════════════════════════
+   JSX:  <section className="error-state" role="alert">
+           <p className="error-code">404</p>
+           <h2 className="error-title">Not Found</h2>
+           <p className="error-message">   <- the backend's message field
+   ─────────────────────────────────────────────────────────────────────────── */
+
 .error-state {
   margin-top: 4rem;
   text-align: center;
   animation: fadeSlideIn 0.3s ease both;
 }
 
+/* Negative letter-spacing: large type looks loose at default tracking */
 .error-code {
+  margin: 0;
   font-size: 7rem;
   font-weight: 800;
-  color: #3f3f46;
-  margin: 0;
   line-height: 0.9;
   letter-spacing: -0.04em;
+  color: #3f3f46;
 }
 
 .error-title {
+  margin: 0.5rem 0 0.75rem;
   font-size: 1.9rem;
   font-weight: 700;
   color: #3f3f46;
-  margin: 0.5rem 0 0.75rem;
 }
 
 .error-message {
+  max-width: 34ch;
+  margin: 0 auto;
   font-size: 0.95rem;
   color: #71717a;
-  margin: 0;
 }
 
-@media (max-width: 480px) {
-  .error-code { font-size: 4.5rem; }
-  .error-title { font-size: 1.4rem; }
-}
+
+/* ═══ 7. EMPTY STATE ════════════════════════════════════════════════════════
+   JSX:  {!loading && !error && !weather && <p className="empty">…
+   Shows something useful on first load - a blank page reads as broken.
+   ─────────────────────────────────────────────────────────────────────────── */
 
 .empty {
   margin-top: 2rem;
   color: #6b7280;
 }
 
-.results { animation: fadeSlideIn 0.35s ease both; }
+
+/* ═══ 8. CURRENT WEATHER CARD ═══════════════════════════════════════════════
+   JSX:  <div className="results">
+           <section className="current">
+             <h2>City, Country</h2>
+             <div className="temp-row"><img><span className="temp">
+             <p>condition</p>
+             <div className="current-details">  <- 2x2 Grid
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* @keyframes, not transition: React adding the element to the DOM is the
+   trigger, and there is no "before" state to transition from. */
+.results {
+  animation: fadeSlideIn 0.35s ease both;
+}
 
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 .current {
   margin-top: 2rem;
   padding: 1.5rem;
-  background: white;
+  background: #fff;
   border-radius: 12px;
 }
 
-.current h2 { margin: 0 0 0.75rem; font-size: 1.25rem; }
+.current h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
 
+/* Flexbox: icon and temperature side by side on one axis.
+   align-items: center keeps the small icon lined up with the large number. */
 .temp-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.temp { font-size: 2.75rem; font-weight: 600; }
-
-.meta { color: #6b7280; font-size: 0.9rem; }
-
-.forecast {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
+.temp {
+  font-size: 2.75rem;
+  font-weight: 600;
 }
 
-.forecast-card {
-  position: relative;
-  padding: 1rem;
-  background: white;
-  border-radius: 12px;
-  text-align: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.forecast-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-}
-
-.forecast-card img {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  width: 38px;
-}
-
-.forecast-card h3 { margin: 0.25rem 0 0.5rem; font-size: 0.9rem; color: #6b7280; }
-
-.range { font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0; }
-
-@media (max-width: 480px) {
-  .temp { font-size: 2.25rem; }
-  form { gap: 0.4rem; }
-  label { width: 100%; }
-}
-
-
-.day-tabs {
-  display: flex;
-  gap: 0.4rem;
-  margin-top: 1.5rem;
-}
-
-.day-tab {
-  background: white;
-  color: #2b7cd3;
-  border: 1px solid #c9d4e0;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.85rem;
-}
-
-.day-tab.active {
-  background: #2b7cd3;
-  color: white;
-  border-color: #2b7cd3;
-}
-
-.hourly {
-  display: flex;
-  gap: 0.6rem;
-  margin-top: 0.75rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 0.5rem;
-  -webkit-overflow-scrolling: touch;
-}
-
-.hour-card {
-  flex: 0 0 74px;
-  scroll-snap-align: start;
-  background: white;
-  border-radius: 12px;
-  padding: 0.7rem 0.4rem;
-  text-align: center;
-}
-
-.hour-card img { width: 32px; }
-.hour-time { font-size: 0.75rem; color: #6b7280; margin: 0 0 0.2rem; }
-.hour-temp { font-size: 1rem; font-weight: 600; margin: 0.2rem 0 0; }
-
-.hourly::-webkit-scrollbar { height: 6px; }
-.hourly::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-
-
+/* Grid, not Flexbox: four figures in two rows and two columns, aligned in
+   both directions. This is the two-dimensional case. */
 .current-details {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -267,52 +557,128 @@ button:active { transform: scale(0.97); }
 }
 
 
-.search-wrap {
-  position: relative;
-  flex: 1;
-  min-width: 160px;
+/* ═══ 9. DAY TABS ═══════════════════════════════════════════════════════════
+   JSX:  <section className="day-tabs">
+           <button className={i === selectedDay ? 'day-tab active' : 'day-tab'}>
+   Switching tabs never refetches - all three days arrive in one response.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Flexbox: three buttons on one axis */
+.day-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
 }
 
-.search-wrap input {
-  width: 100%;
+.day-tab {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  color: #2b7cd3;
+  background: #fff;
+  border: 1px solid #c9d4e0;
 }
 
-.suggestions {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  margin: 0;
-  padding: 0.25rem;
-  list-style: none;
-  background: white;
-  border: 1px solid #d7dde3;
-  border-radius: 8px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  animation: fadeSlideIn 0.15s ease both;
+.day-tab:hover {
+  background: #f4f8fd;
 }
 
-.suggestions button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 0.5rem 0.6rem;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: #1a1a1a;
-  font-size: 0.9rem;
+.day-tab.active {
+  color: #fff;
+  background: #2b7cd3;
+  border-color: #2b7cd3;
 }
 
-.suggestions button:hover,
-.suggestions button:focus {
-  background: #eaf2fb;
+
+/* ═══ 10. HOURLY SCROLLER ═══════════════════════════════════════════════════
+   JSX:  <section className="hourly">
+           <article className="hour-card">
+             <p className="hour-time">  <img>  <p className="hour-temp">
+   24 cards for the selected day.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Flexbox, not Grid: one scrolling row, definitively one-dimensional.
+   scroll-snap makes it settle on a card edge rather than mid-card. */
+.hourly {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding-bottom: 0.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
 }
 
-.suggestions strong { display: block; }
+/* flex: 0 0 74px is shorthand for grow 0, shrink 0, basis 74px.
+   The SHRINK ZERO is the important part: by default flex items shrink to fit
+   their container, so 24 cards would squash into the visible width instead of
+   overflowing. Preventing shrink is what creates the scroll. */
+.hour-card {
+  flex: 0 0 74px;
+  scroll-snap-align: start;
+  padding: 0.7rem 0.4rem;
+  text-align: center;
+  background: #fff;
+  border-radius: 12px;
+}
 
-.suggestions span {
-  font-size: 0.78rem;
+.hour-card img { width: 32px; }
+
+.hour-time {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
   color: #6b7280;
-} 
+}
+
+.hour-temp {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.hourly::-webkit-scrollbar {
+  height: 6px;
+}
+
+.hourly::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+
+/* ═══ 11. RESPONSIVE ════════════════════════════════════════════════════════
+   All breakpoints collected here rather than scattered through the file.
+   Most adaptation happens without a media query: flex-wrap on the form and
+   overflow-x on the scrollers already adjust on their own. Media queries are
+   for the decisions the layout algorithm cannot make - font sizes, and
+   hiding things.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .recent       { gap: 0.5rem; }
+  .recent-label { display: none; }   /* costs more room than it earns */
+  .chip-meta    { display: none; }
+}
+
+@media (max-width: 480px) {
+  form  { gap: 0.4rem; }
+  label { width: 100%; }             /* full line so the input is not squeezed */
+
+  .temp       { font-size: 2.25rem; }
+  .error-code { font-size: 4.5rem; } /* 7rem would overflow a phone */
+  .error-title{ font-size: 1.4rem; }
+}
+
+
+/* ═══ 12. MOTION PREFERENCE ═════════════════════════════════════════════════
+   Respects the OS setting for people who get motion sickness from animation.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -12,6 +12,17 @@ function dayLabel(dateString) {
   return new Date(dateString).toLocaleDateString('en-GB', { weekday: 'short' });
 }
 
+/** "2 min ago", "3 h ago", "yesterday" - how stale the chip snapshot is. */
+function timeAgo(isoString) {
+  const mins = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'yesterday' : `${days} days ago`;
+}
+
 export default function App() {
   const [city, setCity] = useState('');
   const [weather, setWeather] = useState(null);
@@ -21,12 +32,16 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recent, setRecent] = useState([]);
+  const [openMenu, setOpenMenu] = useState(null);
 
   const isCelsius = unit === 'C';
   const activeDay = weather?.forecast?.[selectedDay];
   const canSuggest = city.trim().length >= 3;
 
-    useEffect(() => {
+  // Debounced autocomplete. The cleanup cancels the previous timer, so typing
+  // "london" fires one request instead of six.
+  useEffect(() => {
     if (!canSuggest) return;
 
     const timer = setTimeout(async () => {
@@ -42,6 +57,71 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [city, canSuggest]);
 
+  // Recent searches exist before the user does anything, so this genuinely is
+  // a "sync with the server" job rather than a response to an event.
+  useEffect(() => {
+    loadRecent();
+  }, []);
+
+  // Close the chip menu on an outside click or Escape.
+  //
+  // The cleanup is what matters here: without it every open would leave a
+  // listener attached that never gets removed - a real leak, and the same
+  // mechanism as the debounce above.
+  useEffect(() => {
+    if (!openMenu) return;
+
+    const onDown = (event) => {
+      if (!event.target.closest('.chip-menu, .chip-more')) setOpenMenu(null);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') setOpenMenu(null);
+    };
+
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openMenu]);
+
+  async function loadRecent() {
+    try {
+      const response = await fetch('/api/recent');
+      if (!response.ok) return;
+      setRecent(await response.json());
+    } catch {
+      // History is an enhancement. If it fails, the app carries on without it.
+    }
+  }
+
+  async function removeRecent(query) {
+    // Optimistic update: drop it from the UI immediately, then tell the
+    // server. A delete is very unlikely to fail, and waiting for a round trip
+    // before the chip disappears feels broken.
+    setRecent((list) => list.filter((item) => item.query !== query));
+    setOpenMenu(null);
+
+    try {
+      await fetch(`/api/recent/${encodeURIComponent(query)}`, { method: 'DELETE' });
+    } catch {
+      loadRecent(); // failed, so put the real list back
+    }
+  }
+
+  async function clearAllRecent() {
+    setRecent([]);
+    setOpenMenu(null);
+
+    try {
+      await fetch('/api/recent', { method: 'DELETE' });
+    } catch {
+      loadRecent();
+    }
+  }
+
   function getPosition() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -56,6 +136,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     setShowSuggestions(false);
+    setOpenMenu(null);
 
     try {
       const response = await fetch(`/api/weather?city=${encodeURIComponent(query)}`);
@@ -69,6 +150,7 @@ export default function App() {
 
       setWeather(data);
       setSelectedDay(0);
+      loadRecent(); // the history just changed; nothing waits on this
       return data;
     } catch {
       setError({ status: null, message: 'Could not reach the server. Is the backend running?' });
@@ -170,6 +252,74 @@ export default function App() {
           <span className="switch-knob" />
         </button>
       </form>
+
+      {recent.length > 0 && (
+        <nav className="recent" aria-label="Recent searches">
+          <span className="recent-label">Recent</span>
+
+          <ul>
+            {recent.map((item) => (
+              <li key={item.query}>
+                {/* A container, not a button - a button cannot legally contain
+                    another button, so the chip body and the menu trigger are
+                    siblings inside a div. */}
+                <div className={openMenu === item.query ? 'chip menu-open' : 'chip'}>
+                  <button
+                    type="button"
+                    className="chip-body"
+                    onClick={() => {
+                      setCity(item.displayName);
+                      loadWeather(item.displayName);
+                    }}
+                  >
+                    <img src={`https:${item.icon}`} alt="" className="chip-icon" />
+
+                    <span className="chip-text">
+                      <span className="chip-name">{item.displayName}</span>
+                      <span className="chip-meta">{timeAgo(item.lastSearched)}</span>
+                    </span>
+
+                    <span className="chip-temp">
+                      {Math.round(isCelsius ? item.tempC : item.tempF)}°
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="chip-more"
+                    aria-label={`Options for ${item.displayName}`}
+                    aria-expanded={openMenu === item.query}
+                    onClick={() =>
+                      setOpenMenu((open) => (open === item.query ? null : item.query))
+                    }
+                  >
+                    <span aria-hidden="true">⋮</span>
+                  </button>
+
+                  {openMenu === item.query && (
+                    <div className="chip-menu" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => removeRecent(item.query)}
+                      >
+                        Remove location
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={clearAllRecent}
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
 
       {loading && (
         <div className="loading">

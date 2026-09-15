@@ -3,71 +3,138 @@ import express from 'express';
 import { fetchWeatherData, searchCities } from './services/weatherService.js';
 import { mapWeather } from './services/weatherMapper.js';
 import { getCached, setCached } from './cache.js';
-
+import { connectDb, closeDb } from './db.js';
+import { getCachedFromDb, setCachedInDb } from './repositories/cacheRepository.js';
+import {
+  upsertRecent,
+  listRecent,
+  removeRecent,
+  clearRecent,
+} from './repositories/recentRepository.js';
 
 const app = express();
 const PORT = 3001;
 
-
-//pulling in the city search results from the cities.json file
-app.get('/api/cities', async (req, res) => {
-const q = req.query.q?.trim();
-
-
-  if (!q || q.length < 3) {
-    return res.json([]);
-  }
-const results = await searchCities(q);
-
-  res.json(
-    results.slice(0, 5).map((c) => ({
-      id: c.id,
-      name: c.name,
-      region: c.region,
-      country: c.country,
-    }))
-  );
-});
-
-
-//starting the health check endpoint and the weather endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-//weather endpoint that fetches weather data for a given city
+app.get('/api/cities', async (req, res) => {
+  const q = req.query.q?.trim();
+
+  if (!q || q.length < 3) {
+    return res.json([]);
+  }
+
+  const results = await searchCities(q);
+
+  res.json(
+    results.slice(0, 5).map((city) => ({
+      id: city.id,
+      name: city.name,
+      region: city.region,
+      country: city.country,
+    }))
+  );
+});
+
 app.get('/api/weather', async (req, res) => {
   const city = req.query.city?.trim();
 
+  if (!city) {
+    return res.status(400).json({ message: 'Please enter a city name.' });
+  }
 
-//checking if the city parameter is provided, if not return a 400 error
- if (!city) {
-  return res.status(400).json({ message: 'Please enter a city name.' });
-}
+  const key = city.toLowerCase();
 
-  const cached = getCached(city.toLowerCase());
-  if (cached) return res.json(cached);
+  // Tier 1: in-memory. Microseconds, but per-process and lost on restart.
+  const memoryHit = getCached(key);
+  if (memoryHit) {
+    upsertRecent({ query: key, weather: memoryHit });
+    return res.json(memoryHit);
+  }
 
-  //fetching weather data from the weather service and mapping it to the desired format, caching the result, and returning it as a JSON response
+  // Tier 2: database. Milliseconds, but survives a restart and would be
+  // shared across several server instances behind a load balancer.
+  const dbHit = await getCachedFromDb(key);
+  if (dbHit) {
+    setCached(key, dbHit); // warm tier 1 so the next hit is instant
+    upsertRecent({ query: key, weather: dbHit });
+    return res.json(dbHit);
+  }
+
+  // Tier 3: the provider.
   try {
     const raw = await fetchWeatherData(city, 3);
     const shaped = mapWeather(raw);
-    setCached(city.toLowerCase(), shaped);
+
+    setCached(key, shaped);
+    setCachedInDb(key, shaped);                    // not awaited
+    upsertRecent({ query: key, weather: shaped }); // not awaited
+
     res.json(shaped);
   } catch (error) {
     if (error.code === 'CITY_NOT_FOUND') {
-  return res.status(404).json({
-    message: `We couldn't find "${city}". Check the spelling and try again.`
-  });
-}
+      return res.status(404).json({
+        message: `We couldn't find "${city}". Check the spelling and try again.`,
+      });
+    }
+
     console.error('Weather request failed:', error.message);
     res.status(502).json({
-  message: 'Weather service is unavailable right now. Please try again shortly.'
-});
+      message: 'Weather service is unavailable right now. Please try again shortly.',
+    });
   }
 });
 
-//starting the server and listening on the specified port
-app.listen(PORT, () => {
-  console.log(`Backend listening on http://localhost:${PORT}`);
+// ── Recent searches ──────────────────────────────────────────────────────────
+
+app.get('/api/recent', async (req, res) => {
+  res.json(await listRecent());
 });
+
+// DELETE rather than GET, because this changes state. The HTTP method should
+// say what the request does - a GET is expected to be safe and repeatable.
+app.delete('/api/recent/:query', async (req, res) => {
+  const removed = await removeRecent(req.params.query);
+
+  if (!removed) {
+    return res.status(404).json({ message: 'Not in recent searches.' });
+  }
+
+  // 204 No Content: it worked and there is nothing to send back.
+  res.status(204).end();
+});
+
+app.delete('/api/recent', async (req, res) => {
+  await clearRecent();
+  res.status(204).end();
+});
+
+// ── Startup ──────────────────────────────────────────────────────────────────
+
+/**
+ * Connect the database before accepting traffic, so the first request does not
+ * race the connection. If it fails the server still starts - recent searches
+ * are an enhancement, not a requirement.
+ */
+async function start() {
+  await connectDb();
+
+  const server = app.listen(PORT, () => {
+    console.log(`Backend listening on http://localhost:${PORT}`);
+  });
+
+  // Release the connection pool on Ctrl+C rather than leaving Atlas to time
+  // the sockets out.
+  const shutdown = async () => {
+    server.close();
+    await closeDb();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+start();
